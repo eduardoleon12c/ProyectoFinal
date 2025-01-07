@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,191 +31,225 @@ public class Client {
 	
 	
 	public static void main(String args[]) {
-                Scanner inDatos=new Scanner(System.in);
-		uploaded_files = new HashMap<Integer, String>();
-		uploaded_files = java.util.Collections.synchronizedMap(uploaded_files);
-		sideListener = new ClientConnection(uploaded_files);
-		try {
-                        System.out.println("Dame la direccion del Tracker: ");
-                        IPAddress=InetAddress.getByName(inDatos.next());
-                        System.out.println("Dame el puerto del Tracker: ");
-                        int port_number=inDatos.nextInt();
-			
+        Scanner inDatos = new Scanner(System.in);
+        uploaded_files = Collections.synchronizedMap(new HashMap<>());
+        sideListener = new ClientConnection(uploaded_files);
+        try {
+            System.out.println("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
+            System.out.println("\u2551    Bienvenido al Cliente BitTorrent    \u2551");
+            System.out.println("\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d");
 
-			System.out.println("Conectando con el Tracker...");
-			tcpSocket  = new Socket(IPAddress, port_number);
-			tcpSocket.setSoTimeout(10000);
-			OutputStream out = new BufferedOutputStream(tcpSocket.getOutputStream());
-			InputStream in = new BufferedInputStream(tcpSocket.getInputStream());
+            System.out.print("Dame la direccion del Tracker: ");
+            IPAddress = InetAddress.getByName(inDatos.next());
+            System.out.print("Dame el puerto del Tracker: ");
+            int port_number = inDatos.nextInt();
 
-			buf = Utility.addHeader(Constants.OPEN_CONNECTION, Constants.GREETING.length(), 0);
-			byte[] greetng_bytes = Constants.GREETING.getBytes();
-			for (int i =0; i < Constants.GREETING.length(); i++)
-				buf.put(Constants.HEADER_LEN + i, greetng_bytes[i]);;
-			out.write(buf.array());
-			out.flush();
-			System.out.print("enviando...");
-			
-			// respuesta del tracker
-			if ((buf = Utility.readIn(in, Constants.HEADER_LEN + 8)) == null) {
-				out.close();
-				in.close();
-				tcpSocket.close();
-				throw new IOException("lectura fallida.");
-			}
-			
-			System.out.print("listo!\n");
-			// verifica la conexion
-			if (!Utility.checkHeader(buf, Constants.OPEN_CONNECTION, 8, 0)) {
-				out.close();
-				in.close();
-				tcpSocket.close();
-				throw new RuntimeException("header corrupto desde el tracker!");
-			}
-			
-			id = buf.getInt(Constants.HEADER_LEN);
-			int tcp_port = buf.getInt(Constants.HEADER_LEN + 4);
-			out.close();
-			in.close();
-			tcpSocket.close();
-			
-			// conexion tcp del tracker
-			System.out.print("Estableciendo conexiones con el Tracker...");
-			tcpSocket = new Socket(IPAddress, tcp_port);
-			System.out.print("listo!\n");
-			sideListener.setupConnection(IPAddress, tcp_port);
-			System.out.println("id Tracker:: " + id);
-			sideListener.setId(id);
-			sideListener.start();
-			out = new BufferedOutputStream(tcpSocket.getOutputStream());
-			in = new BufferedInputStream(tcpSocket.getInputStream());
-			BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-			// mantiene la conexion y verifica cada 5 segundos
-			Acker ack;
-			String userInput;
-			System.out.println("opciones:" +
-        			"\n\tarchivos\tArchivos disponibles en la red de peers." +
-        			"\n\tnext\tsiguiente pagina de archivos." +
-        			"\n\tant\tanterior pagina de archivos." +
-        			"\n\tsubir <filePath>\tsubir archivo al tracker (solo nombre: debe estar en la carpeta del proyecto)." +
-        			"\n\tdescargar <numero de lista de los archivos en la red>."+
-                                "\n\texit\tSalir.");
-            while (sideListener.isAlive()) {
-            	timer = new Timer();
-            	ack = new Acker(out, tcpSocket, id);
-            	timer.scheduleAtFixedRate(ack, 0, Constants.ACK_TIMEOUT / 2);
-    			userInput = stdIn.readLine().trim();
-            	timer.cancel();
-            	if (userInput.equals("exit")){
-            		shutdown_normally = true;
-            		break;
-            	}
-            	else if (userInput.equals("archivos")){
-                	//solicita lista de archivos
-                	retrieveFiles(out, in, 1);
-        			page_number = 1;
-        			continue;
-                } else if (userInput.startsWith("next")) {         		
-                	if (num_files_on_tracker > page_number * Constants.PAGE_SIZE) {
-                		page_number++;
-                		retrieveFiles(out, in, page_number);
-                	} else
-                		System.out.println("no hay pagina siguiente son todos los archivos.");
-            		continue;
-            	} else if (userInput.startsWith("ant")) { 	
-            		if (page_number < 2){
-                		System.out.println("no hay pagina anterior son todos los archivos!");
-	            		if (page_number == 0){
-	            			page_number++;
-	            			retrieveFiles(out, in, page_number);
-	                		continue;
-	            		}
-            		}else {
-                		page_number--;
-                		retrieveFiles(out, in, page_number);
-                		continue;
-                	}
-            	} else if (userInput.startsWith("subir")){
-                	if (userInput.length() < 6){
-                		System.out.println("especifica la ruta");
-                		continue;
-                	}
-            		
-            		String filepath = System.getProperty("user.dir") + "/"+userInput.substring(6);
-                	if (uploaded_files != null && uploaded_files.containsValue(filepath))
-                		System.out.println("el archivo: "+userInput.substring(7)+" ya esta subido!");
-                	else if (userInput.length() > 6) {
-                		uploadFile(filepath, out, in);
-                		continue;
-                	}
-                } else if (userInput.startsWith("descargar")){
-                	if (retrieved_files == null){
-                		System.out.println("No hay archivos disponibles");
-                		continue;
-                	}
-                	try {
-	                	String[] splitted = userInput.split(" ");
-	                	if (splitted.length != 2)
-	                		throw new NumberFormatException();
-                		int number = Integer.parseInt(userInput.split(" ")[1]);
-	                	Integer file_id = retrieved_files.get(number);
-	                	if (uploaded_files != null && uploaded_files.containsKey(file_id))
-	                		System.out.println("El archivo ya esta descargado.");
-	                	else if (file_id != null) {
-	                		downloadFile(file_id, out, in, retrieved_file_sizes.get(file_id));
-	                	} else
-	                		System.out.println("numero de archivo" + number + " incorrecto.");
-	                	continue;
-                	} catch (NumberFormatException e){
-                		System.out.println("opcion no valida.");
-                		continue;
-                	}
-                }
-            	System.out.println("opciones:" +
-        			"\n\tarchivos\tArchivos disponibles en la red de peers." +
-        			"\n\tnext\tsiguiente pagina de archivos." +
-        			"\n\tant\tanterior pagina de archivos." +
-        			"\n\tsubir <filePath>\tsubir archivo al tracker (solo nombre: debe estar en la carpeta del proyecto)." +
-        			"\n\tdescargar <numero de lista de los archivos en la red>."+
-                                "\n\texit\tSalir.");
+            System.out.println("Conectando con el Tracker...");
+            tcpSocket = new Socket(IPAddress, port_number);
+            tcpSocket.setSoTimeout(10000);
+            OutputStream out = new BufferedOutputStream(tcpSocket.getOutputStream());
+            InputStream in = new BufferedInputStream(tcpSocket.getInputStream());
+
+            buf = Utility.addHeader(Constants.OPEN_CONNECTION, Constants.GREETING.length(), 0);
+            byte[] greetng_bytes = Constants.GREETING.getBytes();
+            for (int i = 0; i < Constants.GREETING.length(); i++)
+                buf.put(Constants.HEADER_LEN + i, greetng_bytes[i]);
+            out.write(buf.array());
+            out.flush();
+            System.out.println("Enviando... listo!");
+
+            if ((buf = Utility.readIn(in, Constants.HEADER_LEN + 8)) == null) {
+                out.close();
+                in.close();
+                tcpSocket.close();
+                throw new IOException("Lectura fallida.");
             }
-			
-			
-			System.out.println("Cerrando conexion.");
-			buf = Utility.addHeader(Constants.CLOSE_CONNECTION, 0, id);
-			out.write(buf.array());
-			out.flush();
-			sideListener.interrupt();
-			in.close();
-			out.close();
-		} catch (UnknownHostException e) {
-			if (!shutdown_normally){
-				System.err.println("host " + IPAddress +" no reconocible en la red");
-				System.exit(1);
-			}
-		} catch (IOException e) {
-			if (!shutdown_normally){
-				System.err.println("Streams I/O imposibles de obtener" +
-						IPAddress);
-				System.exit(1);
-			}
-		} catch (RuntimeException e){
-			if (!shutdown_normally){
-				System.err.println("ERROR: " + e.getMessage());
-				System.exit(1);
-			}
-		} finally {
-			if (sideListener.isAlive())
-				sideListener.interrupt();
-			try {
-				if (!tcpSocket.isClosed())
-					tcpSocket.close();
-			} catch (IOException e) {
-				return;
-			}
-		}
+
+            if (!Utility.checkHeader(buf, Constants.OPEN_CONNECTION, 8, 0)) {
+                out.close();
+                in.close();
+                tcpSocket.close();
+                throw new RuntimeException("Header corrupto desde el tracker!");
+            }
+
+            id = buf.getInt(Constants.HEADER_LEN);
+            int tcp_port = buf.getInt(Constants.HEADER_LEN + 4);
+            out.close();
+            in.close();
+            tcpSocket.close();
+
+            System.out.println("Estableciendo conexiones con el Tracker... listo!");
+            tcpSocket = new Socket(IPAddress, tcp_port);
+            sideListener.setupConnection(IPAddress, tcp_port);
+            sideListener.setId(id);
+            sideListener.start();
+            out = new BufferedOutputStream(tcpSocket.getOutputStream());
+            in = new BufferedInputStream(tcpSocket.getInputStream());
+            BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
+
+            System.out.println("ID asignado por el Tracker: " + id);
+            mostrarMenu();
+
+            while (sideListener.isAlive()) {
+                timer = new Timer();
+                Acker ack = new Acker(out, tcpSocket, id);
+                timer.scheduleAtFixedRate(ack, 0, Constants.ACK_TIMEOUT / 2);
+                String userInput = stdIn.readLine().trim();
+                timer.cancel();
+
+                switch (userInput.toLowerCase()) {
+					case "4":
+                    case "exit":
+                        shutdown_normally = true;
+                        break;
+					case "1":
+					case "archivos":
+                        retrieveFiles(out, in, 1);
+                        page_number = 1;
+                        break;
+                    case "next":
+                        if (num_files_on_tracker > page_number * Constants.PAGE_SIZE) {
+                            page_number++;
+                            retrieveFiles(out, in, page_number);
+                        } else {
+                            System.out.println("No hay más páginas disponibles.");
+                        }
+                        break;
+                    case "ant":
+                        if (page_number > 1) {
+                            page_number--;
+                            retrieveFiles(out, in, page_number);
+                        } else {
+                            System.out.println("No hay páginas anteriores.");
+                        }
+                        break;
+                    default:
+                        if (userInput.startsWith("subir")) {
+                            manejarSubida(userInput, out, in);
+                        } else if (userInput.startsWith("descargar")) {
+                            manejarDescarga(userInput, out, in);
+                        } else {
+                            System.out.println("Opción no válida. Inténtalo de nuevo.");
+                        }
+                }
+                if (shutdown_normally) break;
+                mostrarMenu();
+            }
+
+            System.out.println("Cerrando conexión.");
+            buf = Utility.addHeader(Constants.CLOSE_CONNECTION, 0, id);
+            out.write(buf.array());
+            out.flush();
+            sideListener.interrupt();
+            in.close();
+            out.close();
+        } catch (Exception e) {
+            if (!shutdown_normally) {
+                System.err.println("Error: " + e.getMessage());
+            }
+        } finally {
+            if (sideListener.isAlive()) sideListener.interrupt();
+            try {
+                if (!tcpSocket.isClosed()) tcpSocket.close();
+            } catch (IOException ignored) {
+            }
+        }
 		
 	}
+
+	private static void mostrarMenu() {
+        System.out.println("\n========================= MENÚ DE OPCIONES ========================");
+        System.out.println("1. archivos     		- Ver archivos disponibles en la red de peers.");
+        System.out.println("2. subir <ruta> 		- Subir un archivo al tracker.");
+        System.out.println("3. descargar <número> 		- Descargar un archivo de la red.");
+        System.out.println("4. exit         		- Salir del cliente.");
+        System.out.println("=====================================================================");
+        System.out.print("Seleccione una opción: ");
+    }
+
+	private static void mostrarArchivos(OutputStream out, InputStream in) {
+        try {
+            retrieveFiles(out, in, 1);
+            page_number = 1;
+            while (true) {
+                if (num_files_on_tracker > Constants.PAGE_SIZE) {
+                    System.out.println("\n================== NAVEGACIÓN ==================");
+                    System.out.println("1. next  - Ver la siguiente página de archivos.");
+                    System.out.println("2. ant   - Ver la página anterior de archivos.");
+                    System.out.println("3. salir - Regresar al menú principal.");
+                    System.out.println("===============================================");
+                    System.out.print("Seleccione una opción: ");
+                    Scanner scanner = new Scanner(System.in);
+                    String opcion = scanner.nextLine().trim().toLowerCase();
+
+                    if (opcion.equals("next")) {
+                        if (num_files_on_tracker > page_number * Constants.PAGE_SIZE) {
+                            page_number++;
+                            retrieveFiles(out, in, page_number);
+                        } else {
+                            System.out.println("No hay más páginas disponibles.");
+                        }
+                    } else if (opcion.equals("ant")) {
+                        if (page_number > 1) {
+                            page_number--;
+                            retrieveFiles(out, in, page_number);
+                        } else {
+                            System.out.println("No hay páginas anteriores.");
+                        }
+                    } else if (opcion.equals("salir")) {
+                        break;
+                    } else {
+                        System.out.println("Opción no válida. Inténtalo de nuevo.");
+                    }
+                } else {
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error al recuperar los archivos: " + e.getMessage());
+        }
+    }
+
+    private static void manejarSubida(String userInput, OutputStream out, InputStream in) {
+        if (userInput.length() < 6) {
+            System.out.println("Especifica la ruta del archivo.");
+            return;
+        }
+        String filepath = System.getProperty("user.dir") + "/" + userInput.substring(6);
+        if (uploaded_files != null && uploaded_files.containsValue(filepath)) {
+            System.out.println("El archivo ya ha sido subido.");
+        } else {
+            try {
+                uploadFile(filepath, out, in);
+            } catch (IOException e) {
+                System.out.println("Error al subir el archivo: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void manejarDescarga(String userInput, OutputStream out, InputStream in) {
+        if (retrieved_files == null) {
+            System.out.println("No hay archivos disponibles para descargar.");
+            return;
+        }
+        try {
+            String[] splitted = userInput.split(" ");
+            if (splitted.length != 2) throw new NumberFormatException();
+            int number = Integer.parseInt(splitted[1]);
+            Integer file_id = retrieved_files.get(number);
+            if (uploaded_files != null && uploaded_files.containsKey(file_id)) {
+                System.out.println("El archivo ya está descargado.");
+            } else if (file_id != null) {
+                downloadFile(file_id, out, in, retrieved_file_sizes.get(file_id));
+            } else {
+                System.out.println("Número de archivo incorrecto.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Entrada inválida. Usa el formato: descargar <número>");
+        } catch (IOException e) {
+            System.out.println("Error al descargar el archivo: " + e.getMessage());
+        }
+    }
 
 	private static void uploadFile(String filepath, OutputStream out, 
 			InputStream in) throws IOException{	
