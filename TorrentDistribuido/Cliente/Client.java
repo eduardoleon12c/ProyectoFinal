@@ -374,35 +374,36 @@ public class Client {
 		else
 			completeDownload(out, in, file_id, result);
 	}
-	
-	private static void completeDownload(OutputStream out, InputStream in, int file_id, File result) throws IOException{
-		timer.cancel(); 
+
+	private static void completeDownload(OutputStream out, InputStream in, int file_id, File result) throws IOException {
+		timer.cancel();
 		System.out.println("finalizando descarga...");
-		
+	
 		buf = Utility.addHeader(Constants.DOWNLOAD_ACK, 4, id);
 		buf.putInt(Constants.HEADER_LEN, file_id);
 		out.write(buf.array());
 		out.flush();
-
-		if ((buf = Utility.readIn(in, Constants.HEADER_LEN)) == null){
+	
+		if ((buf = Utility.readIn(in, Constants.HEADER_LEN)) == null) {
 			result.delete();
 			throw new IOException("lectura fallida.");
 		}
-		if (buf.getInt(0) != Constants.DOWNLOAD_ACK || buf.getInt(8) != id){
+		if (buf.getInt(0) != Constants.DOWNLOAD_ACK || buf.getInt(8) != id) {
 			result.delete();
 			throw new RuntimeException("header corrupta del Tracker.");
 		}
 		int payload_len = buf.getInt(4);
-		if ((buf = Utility.readIn(in, Utility.getPaddedLength(payload_len))) == null){
+		if ((buf = Utility.readIn(in, Utility.getPaddedLength(payload_len))) == null) {
 			result.delete();
 			throw new IOException("lectura fallida.");
 		}
 		File name = new File(getNameFromBuf(0, buf));
-                //guardar y compartir
+		//guardar y compartir
 		result.renameTo(name);
 		uploaded_files.put(file_id, name.getAbsolutePath());
 		System.out.println("Descarga completa en: " + name.getAbsolutePath());
 	}
+
 	
 	private static List<ClientReceiver> getPeers(int file_id, 
 		OutputStream out, InputStream in, String path) throws IOException, RuntimeException{
